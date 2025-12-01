@@ -1,11 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
-// Access environment variables. 
-// In a real app, these would be in a .env file.
-// For this generated code, we use placeholders. User needs to provide their own to make DB work.
-const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+// Read Vite environment variables (VITE_ prefix required)
+const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || "";
+const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
 
-export const supabase = (supabaseUrl && supabaseKey) 
-  ? createClient(supabaseUrl, supabaseKey) 
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
+
+if (!isSupabaseConfigured) {
+  // Helpful warning for local dev: makes it obvious why the app falls back to LocalStorage
+  // eslint-disable-next-line no-console
+  console.warn(
+    "[supabaseClient] Supabase not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env"
+  );
+}
+
+export const supabase = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabaseKey)
   : null;

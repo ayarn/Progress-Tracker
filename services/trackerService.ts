@@ -1,9 +1,9 @@
-import { supabase } from './supabaseClient';
-import { AllTrackersData, TrackerType } from '../types';
-import { formatDateKey } from '../utils/dateUtils';
+import { supabase } from "./supabaseClient";
+import { AllTrackersData, TrackerType } from "../types";
+import { formatDateKey } from "../utils/dateUtils";
 
 // Helper to store in local storage if Supabase is not configured
-const LOCAL_STORAGE_KEY = 'life_grid_data';
+const LOCAL_STORAGE_KEY = "life_grid_data";
 
 const getLocalData = (): AllTrackersData => {
   const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -21,11 +21,11 @@ export const fetchAllActivities = async (): Promise<AllTrackersData> => {
   }
 
   const { data, error } = await supabase
-    .from('activity_logs')
-    .select('tracker_id, date');
+    .from("activity_logs")
+    .select("tracker_id, date");
 
   if (error) {
-    console.error('Error fetching activities:', error);
+    console.error("Error fetching activities:", error);
     return getLocalData(); // Fallback
   }
 
@@ -42,17 +42,17 @@ export const fetchAllActivities = async (): Promise<AllTrackersData> => {
 };
 
 export const toggleActivity = async (
-  trackerId: TrackerType, 
-  date: Date, 
+  trackerId: TrackerType,
+  date: Date,
   currentStatus: boolean,
   currentData: AllTrackersData
 ): Promise<AllTrackersData> => {
   const dateStr = formatDateKey(date);
-  
+
   // Optimistic Update Data structure
   const newData = { ...currentData };
   if (!newData[trackerId]) newData[trackerId] = {};
-  
+
   if (currentStatus) {
     delete newData[trackerId][dateStr];
   } else {
@@ -67,19 +67,34 @@ export const toggleActivity = async (
   try {
     if (currentStatus) {
       // Remove
-      await supabase
-        .from('activity_logs')
+      const { error } = await supabase
+        .from("activity_logs")
         .delete()
         .match({ tracker_id: trackerId, date: dateStr });
+
+      if (error) {
+        console.error("Supabase delete error:", error);
+        // revert optimistic update
+        return currentData;
+      }
+
+      return newData;
     } else {
       // Add
-      await supabase
-        .from('activity_logs')
+      const { error } = await supabase
+        .from("activity_logs")
         .insert([{ tracker_id: trackerId, date: dateStr }]);
+
+      if (error) {
+        console.error("Supabase insert error:", error);
+        // revert optimistic update
+        return currentData;
+      }
+
+      return newData;
     }
-    return newData;
-  } catch (error) {
-    console.error("Error toggling activity:", error);
-    return currentData; // Revert if failed
+  } catch (err) {
+    console.error("Unexpected error toggling activity:", err);
+    return currentData;
   }
 };
