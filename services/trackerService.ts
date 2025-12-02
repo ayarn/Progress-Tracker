@@ -67,7 +67,7 @@ export const toggleActivity = async (
   try {
     if (currentStatus) {
       // Remove
-      const { error } = await supabase
+      const { data: delData, error } = await supabase
         .from("activity_logs")
         .delete()
         .match({ tracker_id: trackerId, date: dateStr });
@@ -78,10 +78,12 @@ export const toggleActivity = async (
         return currentData;
       }
 
+      console.debug("Supabase delete response:", delData);
+
       return newData;
     } else {
       // Add
-      const { error } = await supabase
+      const { data: insertData, error } = await supabase
         .from("activity_logs")
         .insert([{ tracker_id: trackerId, date: dateStr }]);
 
@@ -90,6 +92,8 @@ export const toggleActivity = async (
         // revert optimistic update
         return currentData;
       }
+
+      console.debug("Supabase insert response:", insertData);
 
       return newData;
     }

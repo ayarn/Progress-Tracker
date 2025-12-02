@@ -3,6 +3,7 @@ import { TrackerType, TrackerConfig, AllTrackersData } from "./types";
 import TrackerRow from "./components/TrackerRow";
 import ControlBar from "./components/ControlBar";
 import { fetchAllActivities, toggleActivity } from "./services/trackerService";
+import { formatDateKey } from "./utils/dateUtils";
 
 // Constants for tracker configuration
 const TRACKERS: TrackerConfig[] = [
@@ -54,14 +55,44 @@ const App: React.FC = () => {
 
   const handleToggle = useCallback(
     async (trackerId: TrackerType, date: Date, currentStatus: boolean) => {
-      // Optimistic UI update handled inside service wrapper or local state re-fetch
-      const updatedData = await toggleActivity(
-        trackerId,
-        date,
-        currentStatus,
-        data
-      );
-      setData(updatedData);
+      // Snapshot the current data so we can revert if the service fails
+      const originalData = data;
+
+      // Build optimistic update
+      const dateStr = formatDateKey(date);
+      const optimistic = { ...originalData } as any;
+      if (!optimistic[trackerId]) optimistic[trackerId] = {};
+      if (currentStatus) {
+        delete optimistic[trackerId][dateStr];
+      } else {
+        optimistic[trackerId][dateStr] = true;
+      }
+
+      // Apply optimistic update immediately for snappy UX
+      setData(optimistic);
+
+      // Perform the network/service call. If it fails, toggleActivity
+      // will return the original data and we should revert the state.
+      try {
+        const result = await toggleActivity(
+          trackerId,
+          date,
+          currentStatus,
+          originalData
+        );
+
+        // If the service returned the original data object reference, treat as failure and revert
+        if (result === originalData) {
+          setData(originalData);
+        } else {
+          // Ensure we align with canonical server response (in case service adjusted data)
+          setData(result);
+        }
+      } catch (err) {
+        // On unexpected error, revert optimistic update
+        console.error("Error toggling activity:", err);
+        setData(originalData);
+      }
     },
     [data]
   );
@@ -84,7 +115,7 @@ const App: React.FC = () => {
                 config={tracker}
                 data={data[tracker.id] || {}}
                 onToggle={(date) => {
-                  const dateStr = date.toISOString().split("T")[0];
+                  const dateStr = formatDateKey(date);
                   const isActive = data[tracker.id]?.[dateStr] || false;
                   handleToggle(tracker.id, date, isActive);
                 }}
