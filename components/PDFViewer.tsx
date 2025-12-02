@@ -3,10 +3,16 @@ import { useParams } from "react-router-dom";
 
 const PDFViewer: React.FC = () => {
   const { file } = useParams<{ file: string }>();
-  const basePath = `/notes/${file}`;
+  // Build a production-safe path for the PDF that works after Vite build
+  const baseUrl = (import.meta as any).env?.BASE_URL ?? "/";
+  const rawPath = `${baseUrl.replace(/\/$/, "")}/notes/${file}`.replace(
+    /\/\//g,
+    "/"
+  );
+  const encodedPath = encodeURI(rawPath);
 
   // PDF open params: hide toolbar when supported and fit page to height
-  const iframeSrc = `${basePath}#toolbar=0&view=FitH`;
+  const iframeSrc = `${encodedPath}#toolbar=0&view=FitH`;
 
   return (
     <div className="relative bg-[#0f172a] text-gray-300 w-full h-screen overflow-hidden">
@@ -33,7 +39,7 @@ const PDFViewer: React.FC = () => {
           <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800 text-gray-200">
             <p className="mb-4">Your browser does not support inline PDFs.</p>
             <a
-              href={basePath}
+              href={encodedPath}
               target="_blank"
               rel="noreferrer"
               className="px-4 py-2 bg-blue-600 rounded text-white"
